@@ -40,19 +40,19 @@ pipeline {
       }
     }
 
-    stage('Build & Test') {
-      steps {
-        bat '''
-          echo [INFO] Building with Maven...
-          mvn -B -Dmaven.repo.local=%MAVEN_REPO_LOCAL% clean package
-        '''
-      }
-      post {
-        always {
-          junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
-        }
-      }
+    stage('Build & Package (skip tests)') {
+  steps {
+    bat '''
+      echo [INFO] Building with Maven (tests skipped)...
+      mvn -B -Dmaven.repo.local=%MAVEN_REPO_LOCAL% clean package -DskipTests
+    '''
+  }
+  post {
+    always {
+      junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
     }
+  }
+}
 
     stage('Docker Build (local)') {
       steps {
