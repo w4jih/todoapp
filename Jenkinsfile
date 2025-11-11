@@ -7,7 +7,7 @@ pipeline {
 
   environment {
     DOCKER_IMAGE = 'wajih20032002/todolist'
-    MAVEN_REPO_LOCAL = "${WORKSPACE}/.m2/repository"
+    MAVEN_REPO_LOCAL = "${WORKSPACE}\\.m2\\repository"
   }
 
   stages {
@@ -21,17 +21,31 @@ pipeline {
 
     stage('Env') {
       steps {
-        sh 'java -version || true'
-        sh 'mvn -version || true'
-        sh 'docker --version || true'
-        sh 'minikube version || true'
-        sh 'kubectl version --client || true'
+        bat '''
+          echo [INFO] Java version:
+          java -version
+
+          echo [INFO] Maven version:
+          mvn -version
+
+          echo [INFO] Docker version:
+          docker --version
+
+          echo [INFO] Minikube version:
+          minikube version
+
+          echo [INFO] Kubectl version:
+          kubectl version --client
+        '''
       }
     }
 
     stage('Build & Test') {
       steps {
-        sh 'mvn -B -Dmaven.repo.local=$MAVEN_REPO_LOCAL clean package'
+        bat '''
+          echo [INFO] Building with Maven...
+          mvn -B -Dmaven.repo.local=%MAVEN_REPO_LOCAL% clean package
+        '''
       }
       post {
         always {
@@ -42,36 +56,49 @@ pipeline {
 
     stage('Docker Build (local)') {
       steps {
-        sh '''
-          set -e
-          ARTIFACT=$(ls target/*.jar | head -n1)
-          echo "[INFO] Using artifact: $ARTIFACT"
-          docker build --build-arg JAR_FILE=$ARTIFACT -t ${DOCKER_IMAGE}:latest .
+        bat '''
+          echo [INFO] Looking for JAR in target\\...
+
+          REM Find first JAR in target\\
+          for %%F in (target\\*.jar) do (
+            set "ARTIFACT=%%F"
+            goto foundJar
+          )
+
+          echo [ERROR] No JAR found in target\\
+          exit /b 1
+
+          :foundJar
+          echo [INFO] Using artifact: %ARTIFACT%
+
+          echo [INFO] Building Docker image %DOCKER_IMAGE%:latest ...
+          docker build --build-arg JAR_FILE=%ARTIFACT% -t %DOCKER_IMAGE%:latest .
         '''
       }
     }
 
     stage('Load image into Minikube') {
       steps {
-        sh '''
-          echo "[INFO] Loading image into Minikube..."
-          minikube image load ${DOCKER_IMAGE}:latest
+        bat '''
+          echo [INFO] Loading image into Minikube...
+          minikube image load %DOCKER_IMAGE%:latest
         '''
       }
     }
 
     stage('Deploy to Kubernetes') {
       steps {
-        sh '''
-          echo "[INFO] Applying Kubernetes manifests..."
-          kubectl apply -f k8s/postgres.yaml
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
+        bat '''
+          echo [INFO] Applying Kubernetes manifests...
 
-          echo "[INFO] Current pods:"
+          kubectl apply -f k8s\\postgres.yaml
+          kubectl apply -f k8s\\deployment.yaml
+          kubectl apply -f k8s\\service.yaml
+
+          echo [INFO] Current pods:
           kubectl get pods
 
-          echo "[INFO] Current services:"
+          echo [INFO] Current services:
           kubectl get svc
         '''
       }
