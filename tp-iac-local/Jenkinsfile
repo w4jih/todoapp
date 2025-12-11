@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+    }
+
+    environment {
+        DOCKER_IMAGE = "wajih20032002/todo-app"
+        MAVEN_REPO_LOCAL = "${WORKSPACE}/.m2/repository"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/Macktireh/SpringBootTodolist.git'
+            }
+        }
+
+        stage('Environment Info') {
+            steps {
+                sh '''
+                    echo "[INFO] Java version:"
+                    java -version
+
+                    echo "[INFO] Maven version:"
+                    mvn -version
+
+                    echo "[INFO] Docker version:"
+                    docker --version
+
+                    echo "[INFO] Terraform version:"
+                    terraform version
+                '''
+            }
+        }
+
+        stage('Build & Package (skip tests)') {
+            steps {
+                sh '''
+                    echo "[INFO] Building with Maven..."
+                    mvn -B -Dmaven.repo.local=$MAVEN_REPO_LOCAL clean package -DskipTests
+                '''
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    echo "[INFO] Detecting JAR file in target/..."
+                    ARTIFACT=$(ls target/*.jar | head -n 1)
